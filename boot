@@ -1,4 +1,3 @@
-
 [bits 16]
 [org 0x7C00] ; pierwszy adress zapisu kodu czytany przez BIOS
 
