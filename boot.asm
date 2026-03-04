@@ -23,7 +23,7 @@ done:
 cli
 hlt ;stop
 
-gdt_start:
+gdt_start:       ;Global descyptor table
  db 0x00000000
  db 0x00000000
  ; code segment deskryptor
