@@ -56,7 +56,7 @@ gdt_end:
 
 gdt_descryptor: 
 dw gdt_end - gdt_start - 1 ;wielkość gdt -1
-dd gdt_start    ;adres gdt
+dd gdt_start + 0x7C00   ;adres gdt
 
 
 
