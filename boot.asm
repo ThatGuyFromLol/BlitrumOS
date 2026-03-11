@@ -33,7 +33,7 @@ db 'hello world boot',0
 
 gdt_start:       
 ;Global descyptor table
- dq 0x00000000 ;null deskryptor
+ dq 0x0000000000000000 ;null deskryptor
  
 ; code segment deskryptor
 gdt_code:
