@@ -60,6 +60,14 @@ dd gdt_start    ;adres gdt
 
 [bita 32]
 protected_mode:
+mov ax, 0x10
+mov ds, ax
+mov es, ax
+mov ds, ax
+
+mov esp, 0x90000
+jmp $
+
 
 
 times 510 - ($-$$) db 0 ;wypełniamy resztę zerami, aby mieć 512 bajtów
