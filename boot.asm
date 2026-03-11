@@ -63,7 +63,7 @@ protected_mode:
 mov ax, 0x10
 mov ds, ax
 mov es, ax
-mov ds, ax
+mov ss, ax
 
 mov esp, 0x90000
 jmp $
