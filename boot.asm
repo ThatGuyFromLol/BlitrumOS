@@ -10,6 +10,10 @@ mov ss, ax
 mov sp, 0x7C00 
 sti ;włącza interupty
 lgdt [gdt_descryptor] ;ładuje gdt do rejestru gdtr
+mov eax,cr0
+or eax, 1
+mov cr0, eax
+jmp 0x08
 mov si, msg
 
 print: 
@@ -53,6 +57,9 @@ gdt_end:
 gdt_descryptor: 
 dw gdt_end - gdt_start - 1 ;wielkość gdt -1
 dd gdt_start    ;adres gdt
+
+[bita 32]
+protected_mode:
 
 
 times 510 - ($-$$) db 0 ;wypełniamy resztę zerami, aby mieć 512 bajtów
