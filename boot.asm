@@ -13,7 +13,7 @@ lgdt [gdt_descryptor] ;ładuje gdt do rejestru gdtr
 mov eax,cr0
 or eax, 1
 mov cr0, eax
-jmp 0x08
+jmp 0x08:protected_mode
 mov si, msg
 
 print: 
