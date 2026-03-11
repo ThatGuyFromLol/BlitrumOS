@@ -10,26 +10,13 @@ mov ss, ax
 mov sp, 0x7C00 
 sti ;włącza interupty
 lgdt [gdt_descryptor] ;ładuje gdt do rejestru gdtr
+
 mov eax,cr0
 or eax, 1
 mov cr0, eax
+
 jmp 0x08:protected_mode
-mov si, msg
 
-print: 
-lodsb ;ładuje bit si:ds oraz używa si
-cmp al, 0 
-je done
-mov ah, 0x0E
-int 0x10
-jmp print
-
-done: 
-cli
-hlt ;stop
-
-msg: 
-db 'hello world boot',0
 
 gdt_start:       
 ;Global descyptor table
@@ -68,7 +55,7 @@ mov ss, ax
 mov esp, 0x90000
 jmp $
 
-
+mov dword [0xB8000], 0x2F412F41 ;wypisuje "AA" na ekranie
 
 times 510 - ($-$$) db 0 ;wypełniamy resztę zerami, aby mieć 512 bajtów
 dw 0xAA55 ; bootloader musi mieć 512 bajtów, więc wypełniamy resztę zerami, a na końcu dodajemy magiczną liczbę 0xAA55
