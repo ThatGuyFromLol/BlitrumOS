@@ -30,6 +30,7 @@ mov esp, 0x90000
 
 Print_aa:
 mov dword [0xB8000], 0x2F412F41 ;wypisuje "AA" na ekranie
+hlt
 jmp Print_aa
 
 
