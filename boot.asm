@@ -22,9 +22,10 @@ jmp 0x08:protected_mode ;przeskok do kodu w trybie chronionym
 
 [bits 32]
 protected_mode:
-mov ax, 0x10
-mov ds, ax
-mov es, ax
+cli
+mov ax, 0x10 ;ustaw segment danych na 0x10, który jest deskryptorem danych w GDT
+mov ds, ax ;ustaw segment danych na 0x10, który jest deskryptorem danych w GDT na rejestrach ax, ds, es, ss
+mov es, ax 
 mov ss, ax
 mov esp, 0x90000
 
