@@ -66,4 +66,3 @@ dd gdt_start  ;adres gdt
 
 times 510 - ($-$$) db 0 ;wypełniamy resztę zerami, aby mieć 512 bajtów
 dw 0xAA55 ; bootloader musi mieć 512 bajtów, więc wypełniamy resztę zerami, a na końcu dodajemy magiczną liczbę 0xAA55
-; notatka. komputer pokazuje aa i sie resetuje. napraw problem za nim pojdziesz w x86_64
