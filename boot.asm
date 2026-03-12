@@ -28,8 +28,10 @@ mov es, ax
 mov ss, ax
 mov esp, 0x90000
 
+Print_aa:
 mov dword [0xB8000], 0x2F412F41 ;wypisuje "AA" na ekranie
-jmp $ ;zatrzymuje program
+jmp Print_aa
+
 
 gdt_start:       
 ;Global descyptor table
