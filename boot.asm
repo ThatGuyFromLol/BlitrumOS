@@ -33,7 +33,7 @@ mov eax, cr4
 or eax, 0x20 ;ustawiamy bit PAE 
 mov cr4, eax
 ;włączamy long mode
-mov eax, plm4_table ;adres tabeli PML4
+mov eax, pml4_table ;adres tabeli PML4
 mov cr3, eax ;ładowanie adresu tabeli PML4 do rejestru cr3
 mov eax, 0xC0000080 ;adres rejestru EFER
 rdmsr ;odczyt wartości rejestru EFER do rejestru edx:eax
