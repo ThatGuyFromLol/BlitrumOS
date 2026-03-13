@@ -35,7 +35,7 @@ mov cr4, eax
 ;włączamy long mode
 mov ecx, 0xC0000080
 rdmsr ;odczytujemy MSR IA32_EFER do rejestru edx:eax
-or eax, 0x100 ;ustawiamy bit LME w rejestrze EFER
+add eax, 0x100 ;ustawiamy bit LME w rejestrze EFER
 wrmsr ;zapisujemy z powrotem do MSR IA32_EFER 
 mov eax, cr0 
 or eax, 0x80000000 ;ustawiamy bit PG w rejestrze CR0, aby włączyć stronicowanie
@@ -102,6 +102,3 @@ align 4096
 pd_table:
  dq 0x00000000 | 0x83  
  times 511 dq 0
-
-times 510 - ($-$$) db 0 ;wypełniamy resztę zerami, aby mieć 512 bajtów
-dw 0xAA55 ; bootloader musi mieć 512 bajtów, więc wypełniamy resztę zerami, a na końcu dodajemy magiczną liczbę 0xAA55
