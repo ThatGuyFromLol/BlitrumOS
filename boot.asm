@@ -49,7 +49,7 @@ cli
 
 long_mode:
 mov rax, 0xB8000 ;adres bufora tekstowego w pamięci
-mov rbx, 0x2F412F2F412F412F41
+mov rbx, 0x2F412F412F41 ;tekst "////A" w kodzie ASCII (0x2F = '/', 0x41 = 'A')
 mov [rax], rbx ;wypisujemy tekst "////A" na ekranie
 halt:
 hlt
