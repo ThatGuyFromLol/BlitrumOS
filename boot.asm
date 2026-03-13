@@ -48,12 +48,18 @@ jmp long_mode ;przeskok do kodu w trybie długim (long mode)
 cli
 
 long_mode:
-mov rax, 0xB8000 ;adres bufora tekstowego w pamięci
-mov rbx, 0x2F412F412F41 ;tekst "////A" w kodzie ASCII (0x2F = '/', 0x41 = 'A')
-mov [rax], rbx ;wypisujemy tekst "////A" na ekranie
-halt:
-hlt
-jmp halt ;zatrzymujemy procesor
+mov ax, 0x10 ;ustaw segment danych na 0x10, który jest deskryptorem danych w GDT
+mov ds, ax ;ustaw segment danych na 0x10, który jest deskryptorem danych w GDT na rejestrach ax, ds, es, ss
+mov es, ax
+mov ss, ax
+mov rsp, 0x90000 ;ustaw stos na 0x90000
+;tutaj można umieścić kod, który będzie wykonywany w trybie długim (long mode)  
+mov rax, 0xb8000 ;adres pamięci wideo
+mov rbx , 0x2F412F412F412F41 ;tekst "Hello World!" w formacie ASCII
+mov [rax], rbx ;zapisz tekst do pamięci wideo
+HALT:
+hlt ;zatrzymaj procesor
+jmp HALT ;niekończąca się pętla, aby procesor nie wykonywał nieznanego kodu po zakończeniu naszego programu
 
 gdt_start:       
 ;Global descyptor table
