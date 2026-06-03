@@ -55,6 +55,7 @@ mov ss, ax
 mov rsp, 0x90000 ;ustaw stos na 0x90000
 ;tutaj można umieścić kod, który będzie wykonywany w trybie długim (long mode)  
 mov rax, 0x00100000
+jmp rax
 
 
 
