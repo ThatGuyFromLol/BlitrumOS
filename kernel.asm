@@ -5,4 +5,4 @@ global start
 
 start: 
 
-mov rax, 0x00
+mov rax, 0x0
