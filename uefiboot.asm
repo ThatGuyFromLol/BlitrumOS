@@ -10,5 +10,5 @@ mov rdx, [rcx + 64] ;wskaźnik conout
 mov rcx, rdx ;komenda print
 mov rcx, rdx
 lea rdx, [rel hello_str]
-call [qword[sys_table]+64 
+call [qword[sys_table]+64]
 
