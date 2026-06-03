@@ -54,9 +54,7 @@ mov es, ax
 mov ss, ax
 mov rsp, 0x90000 ;ustaw stos na 0x90000
 ;tutaj można umieścić kod, który będzie wykonywany w trybie długim (long mode)  
-mov rax, 0xb8000 ;adres pamięci wideo
-mov rbx , 0x2F412F412F412F41 ;tekst "Hello World!" w formacie ASCII
-mov [rax], rbx ;zapisz tekst do pamięci wideo
+mob rsp
 
 
 
