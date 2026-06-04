@@ -18,7 +18,7 @@ mov rax ,0x00100000
 jmp rax
 
 hang:
-hot
+hlt
 jmp hang
 
 section .data
