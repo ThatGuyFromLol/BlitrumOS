@@ -13,7 +13,7 @@ lea rdx, [rel hello_str]
 call qword [rbx + 8]
 
 ;tutaj load Kernel jeśli do testów usunąć sekcje mov rax i jmp aby nie crashowało z pliku kernel
-mob rcx,sys_table
+mov rcx,sys_table
 mov rdx, 0x55454649
 
 mov rax ,0x00100000
