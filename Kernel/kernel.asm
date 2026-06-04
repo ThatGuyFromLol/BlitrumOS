@@ -6,3 +6,7 @@ global start
 start: 
 
 mov rax, 0x0
+
+halt:
+hlt
+jmp halt
