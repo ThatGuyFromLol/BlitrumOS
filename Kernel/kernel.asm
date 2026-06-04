@@ -4,6 +4,7 @@
 global start
 
 start: 
+cli
 
 mov rax, 0x0
 
