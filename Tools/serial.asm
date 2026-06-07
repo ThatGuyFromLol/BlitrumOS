@@ -113,7 +113,7 @@ serial_init:
     pop rax
     ret
 
-.init_msg: db "=== Nowatorski Wektorowy OS — Serial Debug aktywny ===", 0
+.init_msg: db "=== BlitrumOS — Serial Debug aktywny ===", 0
 
 
 ; ==============================================================================
