@@ -1,6 +1,12 @@
 bits 64
-: MULTICORE 
-global _start
+; MULTICORE
+; BUGFIX: linia zaczynała się od `:` (`: MULTICORE`) — to nieprawidłowa składnia
+; NASM i przerywała asemblację. Zmieniono na komentarz `;`.
+;
+; BUGFIX: ten moduł eksportował `_start`, który JUŻ istnieje w Kernel.asm.
+; Linkowanie obu plików dawało "multiple definition of _start". Lokalny punkt
+; wejścia BSP zmieniono na `mp_bsp_start` i nie jest już globalny — jądro
+; wywołuje wielordzeniowość przez `init_multicore`, nie przez drugi `_start`.
 global init_multicore
 global ap_kernel_main
 
@@ -13,7 +19,7 @@ section .text
 ; ==============================================================================
 ; PUNKTY WEJŚCIA DLA RDZENIA GŁÓWNEGO (BSP)
 ; ==============================================================================
-_start:
+mp_bsp_start:
     cli
     mov rsp, stack_top
 

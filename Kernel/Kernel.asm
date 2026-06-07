@@ -49,31 +49,58 @@ section .text
 ; ==============================================================================
 _start:
     cli                         ; 1. Sprzętowa blokada przerwań na czas rozruchu
-    mov rsp, stack_top          ; 2. Uruchomienie bezpiecznego stosu jądra (BSP)
 
     ; --- 3. WERYFIKACJA SYGNATURY PLATFORMY BOOTLOADERA ---
     cmp rdx, 0x55454649         ; Czy bootloader UEFI przesłał sygnaturę "UEFI"?
     jne .kernel_panic           ; Brak flagi -> natychmiastowe zatrzymanie jądra
+
+    ; --- 2. ODCZYT PARAMETRÓW ROZDZIELCZOŚCI Z BOOTLOADERA ---
+    ; UWAGA: bootloader skoczył tu instrukcją `jmp` (bez `call`), więc nie odłożył
+    ; adresu powrotu. Parametry leżą na stosie bootloadera od [rsp+32] w górę.
+    ; Musimy je odczytać ZANIM przełączymy stos na własny.
+    mov eax, [rsp + 32]         ; Szerokość ekranu (Width)
+    mov [fb_width], eax
+    mov eax, [rsp + 40]         ; Wysokość ekranu (Height)
+    mov [fb_height], eax
+    mov eax, [rsp + 48]         ; Pixels Per Scan Line (PPS)
+    mov [fb_pps], eax
+
+    ; --- ODCZYT MAPY PAMIĘCI UEFI PRZEKAZANEJ PRZEZ BOOTLOADER ---
+    mov rax, [rsp + 56]         ; Wskaźnik na mapę pamięci (EFI_MEMORY_DESCRIPTOR[])
+    mov [mmap_ptr], rax
+    mov rax, [rsp + 64]         ; Łączny rozmiar mapy w bajtach
+    mov [mmap_size], rax
+    mov rax, [rsp + 72]         ; Rozmiar pojedynczego deskryptora
+    mov [mmap_descsz], rax
 
     ; Przenosimy parametry z bootloadera do rejestrów nieulotnych zgodnie z ABI
     mov r12, rcx                ; R12 = Adres UEFI sys_table
     mov r13, r8                 ; R13 = Aktualny rejestr CR3
     mov r14, r9                 ; R14 = Fizyczny adres Framebuffera GOP (HDMI/DP)
 
+    ; Teraz bezpiecznie uruchamiamy własny stos jądra (BSP)
+    mov rsp, stack_top
+
     ; --- 4. AKTYWACJA UNIKALNEJ TABELI AKTUALIZACJI (AHS-TUS) ---
     call update_system_init     ; Przygotowuje tabelę w locie na dynamiczne wektory w RAM
 
     ; --- 5. INICJALIZACJA DYNAMICZNEGO MENEDŻERA RAM (PMM) ---
+    ; PMM oczekuje (Microsoft x64 ABI): RCX=DescriptorSize, R8=MemoryMapSize,
+    ; R9=wskaźnik na mapę. Wcześniej wywołanie nie przekazywało żadnych argumentów,
+    ; więc PMM dostał śmieci i nie oznaczył żadnej wolnej strony RAM.
+    mov rcx, [mmap_descsz]      ; RCX = DescriptorSize
+    mov r8,  [mmap_size]        ; R8  = MemoryMapSize
+    mov r9,  [mmap_ptr]         ; R9  = wskaźnik na mapę pamięci
     call pmm_init               ; Buduje krzemową bitmapę wolnych stron 4KB pamięci
 
     ; --- 6. URUCHOMIENIE TARCZY OCHRONNEJ PROCESORA (IDT) ---
     call idt_init               ; Przechwytywanie wyjątków i ochrona przed Triple Fault
 
     ; --- 7. WEKTOROWA INICJALIZACJA GRAFIKI HDR (AVX-2 GUI ENGINE) ---
-    ; Pobieramy parametry rozdzielczości przekazane przez bootloader na stosie
-    mov edx, [rsp + 40]         ; Szerokość ekranu (Width)
-    mov r8d, [rsp + 48]         ; Wysokość ekranu (Height)
-    mov r9d, [rsp + 56]         ; Pixels Per Scan Line (PPS)
+    ; Pobieramy parametry rozdzielczości zapisane wcześniej w sekcji .data
+    mov edx, [fb_width]         ; Szerokość ekranu (Width)
+    mov r8d, [fb_height]        ; Wysokość ekranu (Height)
+    mov r9d, [fb_pps]           ; Pixels Per Scan Line (PPS)
     mov rcx, r14                ; Baza pamięci wideo monitora
     call gui_init               ; Zaalokowanie 64-bitowego Backbuffera i uzbrojenie AVX
 
@@ -94,7 +121,7 @@ _start:
 .skip_audio:
 
     ; B. Porty i Kontroler USB 3.0 (xHCI - Plik: usb_controller.asm)
-    call find_usb_controllers   ; Skanowanie PCI i odebranie kontroli od BIOS (Handshake) [INDEX]
+    call find_usb_controllers   ; Skanowanie PCI i odebranie kontroli od BIOS (Handshake)
     jc .skip_usb
     mov [xhci_base_mmio], rax   ; Zachowaj adres rejestrów
     
@@ -107,7 +134,7 @@ _start:
     call update_register_vector ; Rejestracja wektora USB 3.0 w tabeli aktualizacji
 .skip_usb:
 
-    ; C. Kontroler Masowy SATA i Montowanie Systemu Plików TGFS (Pliki: ahci.asm, tgfs_vfs.asm)
+    ; C. Kontroler Masowy SATA i Montowanie Systemu Plików TGFS
     call find_ahci_controller
     jc .skip_storage
     call init_ahci_controller   ; Włączenie trybu AHCI dla dysków SSD/HDD
@@ -124,47 +151,45 @@ _start:
 .skip_storage:
 
     ; --- 9. INICJALIZACJA SCHEDULERA ZDARZENIOWEGO (BME-QD) ---
-    call scheduler_init         ; Przygotowanie 64-bitowej maski procesów (custom_sceduler.asm)
+    call scheduler_init         ; Przygotowanie 64-bitowej maski procesów
 
     ; --- KROK 10: URUCHOMIENIE INTERFEJSU GRAFICZNEGO ---
     cmp byte [tgfs_active], 1
     jne .fallback_render
 
-    ; Szukamy na dysku TGFS binarnego pliku Twojego GUI (np. pod unikalnym ID = 5)
+    ; Szukamy na dysku TGFS binarnego pliku GUI (np. pod unikalnym ID = 5)
     mov rcx, 0                  ; Port SATA 0
     mov rdx, 5                  ; ID pliku w Tag Registry
     mov r8, 0x00800000          ; Bezpieczna przestrzeń w RAM na rozpakowanie kodu
-    call tgfs_load_and_map_file ; JMP-Loader w locie parsuje (Natywny/ELF/EXE), relokuje Zero-Copy
+    call tgfs_load_and_map_file ; JMP-Loader parsuje (Natywny/ELF/EXE), relokuje Zero-Copy
     
-    ; Przekazujemy punkt startowy (Entry Point) zwrócony w RAX do Schedulera
+    ; Przekazujemy punkt startowy zwrócony w RAX do Schedulera
     mov rcx, rax                ; RCX = RIP aplikacji startowej (GUI)
-    mov rdx, 0x00A00000         ; RDX = Adres nowo utworzonego stosu dla GUI wątku w RAM
+    mov rdx, 0x00A00000         ; RDX = Adres nowo utworzonego stosu dla GUI wątku
     call scheduler_create_task  
     
-    ; Zapalamy bit wątku GUI w masce — od tej milisekundy przejmuje kontrolę nad PC
+    ; Zapalamy bit wątku GUI w masce
     mov rcx, rax                
     call scheduler_trigger_event
     jmp .system_execute
 
 .fallback_render:
-    ; AWARYJNY RENDERING (Gdy uruchamiasz system na czystym dysku bez plików TGFS)
-    ; Używamy kodu z Twojego pliku gui_men.asm do narysowania pierwszego testowego okna
+    ; AWARYJNY RENDERING (gdy uruchamiasz system na czystym dysku bez plików TGFS)
     mov ecx, 150                ; Współrzędna X
     mov edx, 150                ; Współrzędna Y
     mov r8d, 500                ; Szerokość okna
     mov r9d, 350                ; Wysokość okna
-    call gui_draw_window        ; Rysuje jasnoszare okno z granatową belką w Backbufferze RAM
+    call gui_draw_window        ; Rysuje jasnoszare okno z granatową belką w Backbufferze
 
-    call gui_refresh_screen     ; AVX-2 Blitter konwertuje w locie i wyrzuca obraz na HDMI/DP
+    call gui_refresh_screen     ; AVX-2 Blitter konwertuje i wyrzuca obraz na HDMI/DP
 
 .system_execute:
     ; --- 11. ROZPOCZĘCIE ASYNCHRONICZNEJ PRACY EKOSYSTEMU ---
     sti                         ; Całkowite zezwolenie na sprzętowe przerwania procesora
 
     ; Bezczynna pętla jądra (Idle Thread - Zadanie 0).
-    ; Gdy procesy śpią w masce, rdzeń BSP bezpiecznie odpoczywa tutaj.
 .kernel_idle_loop:
-    hlt                         ; Energooszczędne wyłączenie rdzenia do nadejścia sygnału/przerwania
+    hlt                         ; Energooszczędne wyłączenie rdzenia do nadejścia przerwania
     jmp .kernel_idle_loop
 
 ; Przechwytywanie awarii krytycznej (Kernel Panic)
@@ -177,6 +202,12 @@ _start:
 section .data
 align 8
 xhci_base_mmio:   dq 0          ; Przechowuje fizyczny adres rejestrów USB 3.0
+mmap_ptr:         dq 0          ; Wskaźnik na mapę pamięci UEFI
+mmap_size:        dq 0          ; Łączny rozmiar mapy pamięci w bajtach
+mmap_descsz:      dq 0          ; Rozmiar pojedynczego deskryptora pamięci
+fb_width:         dd 0          ; Szerokość ekranu przekazana przez bootloader
+fb_height:        dd 0          ; Wysokość ekranu przekazana przez bootloader
+fb_pps:           dd 0          ; Pixels Per Scan Line przekazane przez bootloader
 tgfs_active:      db 0          ; Flaga statusu systemu plików: 1 = Aktywny
 
 section .bss

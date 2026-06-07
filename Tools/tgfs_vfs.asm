@@ -17,34 +17,31 @@ global tgfs_load_and_map_file
 global syscall_compatibility_layer
 
 ; Importy niskopoziomowe ze sterowników sprzętowych projektu
-extern ahci_read_sectors        ; z ahci_disk.asm
-extern pmm_alloc_page           ; z pmm.asm
+extern ahci_read_sectors        ; z ahci.asm (DMA odczyt sektorów SATA)
+extern pmm_alloc_page           ; z ppm.asm
 
 ; Typy systemów plików obsługiwane przez VFS
 FS_TYPE_UNKNOWN equ 0
 FS_TYPE_TGFS    equ 1
 
 ; Definicje masek bitowych formatów w TGFS (Polymorphic Identifiers)
-TAG_SYSTEM      equ 1 << 0      ; Bit 0: Pliki systemowe kernela
-TAG_GUI         equ 1 << 1      ; Bit 1: Elementy interfejsu graficznego
-TAG_APPLICATION equ 1 << 2      ; Bit 2: Programy (Natywne / Obce)
-TAG_IMAGE       equ 1 << 3      ; Bit 3: Surowe bitmapy graficzne TrueColor
-TAG_FOREIGN_ELF equ 1 << 16     ; Bit 16: Flaga formatu Linux ELF64
-TAG_FOREIGN_EXE equ 1 << 17     ; Bit 17: Flaga formatu Windows PE/EXE
+TAG_SYSTEM      equ 1 << 0
+TAG_GUI         equ 1 << 1
+TAG_APPLICATION equ 1 << 2
+TAG_IMAGE       equ 1 << 3
+TAG_FOREIGN_ELF equ 1 << 16
+TAG_FOREIGN_EXE equ 1 << 17
 
 section .data
 align 8
-current_fs_type:    db 0        ; Wykryty typ systemu plików na dysku
-tgfs_registry_lba:  dq 0        ; Fizyczny sektor LBA Tag Registry
-
-; Magiczna sygnatura Twojego systemu plików opartego o tagi
+current_fs_type:    db 0
+tgfs_registry_lba:  dq 0
 tgfs_signature:     db "TGFS"
 
 section .text
 
 ; ==============================================================================
 ; FUNKCJA 1: vfs_mount_drive
-; Podmontowuje dysk i weryfikuje obecność sygnatury TGFS w Superblocku.
 ; ==============================================================================
 vfs_mount_drive:
     push rbx
@@ -56,13 +53,12 @@ vfs_mount_drive:
     push rsi
 
     sub rsp, 512
-    mov r9, rsp                 ; Bufor na stosie
-    
-    mov rdx, 1                  ; LBA = 1 (Superblock)
-    mov r8, 1                   ; Czytaj 1 sektor
+    mov r9, rsp
+    mov rdx, 1
+    mov r8, 1
     call ahci_read_sectors
 
-    mov rsi, r9                 
+    mov rsi, r9
     lea rdi, [rel tgfs_signature]
     mov eax, [rsi]
     mov ebx, [rdi]
@@ -71,17 +67,17 @@ vfs_mount_drive:
 
 .found_tgfs:
     mov byte [current_fs_type], FS_TYPE_TGFS
-    mov rax, [r9 + 8]           ; Offset 8: LBA rejestru tagów
+    mov rax, [r9 + 8]
     mov [tgfs_registry_lba], rax
-    mov rax, FS_TYPE_TGFS       
+    mov rax, FS_TYPE_TGFS
     jmp .exit
 
 .unknown_fs:
     mov byte [current_fs_type], FS_TYPE_UNKNOWN
-    xor rax, rax                
+    xor rax, rax
 
 .exit:
-    add rsp, 512                
+    add rsp, 512
     pop rsi
     pop rdi
     pop r9
@@ -94,7 +90,6 @@ vfs_mount_drive:
 
 ; ==============================================================================
 ; FUNKCJA 2: tgfs_find_files_by_tag
-; Filtruje Tag Registry i zwraca ID wszystkich plików pasujących do maski tagów.
 ; ==============================================================================
 tgfs_find_files_by_tag:
     push rbx
@@ -108,9 +103,9 @@ tgfs_find_files_by_tag:
     push r13
     push r14
 
-    mov r12, rdx                ; R12 = Szukana maska tagów bitowych
-    mov r13, r8                 ; R13 = Bufor RAM na ID plików
-    mov r14, rcx                ; R14 = Port SATA
+    mov r12, rdx
+    mov r13, r8
+    mov r14, rcx
 
     sub rsp, 512
     mov r9, rsp
@@ -119,37 +114,34 @@ tgfs_find_files_by_tag:
     mov rcx, r14
     call ahci_read_sectors
 
-    xor rsi, rsi                ; RSI = Licznik trafień
-    mov rbx, 0                  ; RBX = Indeks pętli (0..7)
+    xor rsi, rsi
+    mov rbx, 0
 
 .search_loop:
     mov rdi, rsp
     mov rax, rbx
-    shl rax, 6                  ; rbx * 64 bajty
-    add rdi, rax                ; RDI = Adres wpisu w pamięci stosu
+    shl rax, 6
+    add rdi, rax
 
-    mov edx, [rdi]              ; Sprawdź czy ID != 0
+    mov edx, [rdi]
     test edx, edx
     jz .next_entry
 
-    mov rax, [rdi + 4]          ; Pobierz 64-bitową maskę tagów pliku
-    
-    ; KRZEMOWA FILTRACJA: Sprawdzamy czy plik posiada szukane cechy (Tagi)
+    mov rax, [rdi + 4]
     and rax, r12
     cmp rax, r12
-    jne .next_entry             
+    jne .next_entry
 
-    ; Plik spełnia wymagania. Zapisz jego ID do tablicy.
     mov [r13 + rsi * 4], edx
-    inc rsi                     
+    inc rsi
 
 .next_entry:
     inc rbx
-    cmp rbx, 8                  
+    cmp rbx, 8
     jl .search_loop
 
-    mov rax, rsi                
-    add rsp, 512                
+    mov rax, rsi
+    add rsp, 512
     pop r14
     pop r13
     pop r12
@@ -162,13 +154,7 @@ tgfs_find_files_by_tag:
 
 
 ; ==============================================================================
-; FUNKCJA 3: tgfs_load_and_map_file (JIT-Mapped Poly-Loader Architecture)
-; Odnajduje plik, identyfikuje format po tagu binarnej zgodności, 
-; a dla danych stosuje Direct Streaming, omijając tradycyjne kopiowanie RAM.
-; Wejście:
-;   RCX = Port SATA, RDX = File ID, R8 = Bufor docelowy RAM (lub urządzenia MMIO)
-; Zwraca:
-;   RAX = Entry Point (dla aplikacji) lub Rozmiar w bajtach (dla danych / grafiki)
+; FUNKCJA 3: tgfs_load_and_map_file
 ; ==============================================================================
 tgfs_load_and_map_file:
     push rbx
@@ -182,9 +168,9 @@ tgfs_load_and_map_file:
     push r13
     push r14
 
-    mov r12d, edx               ; R12D = Szukane ID
-    mov r13, r8                 ; R13  = Adres docelowy RAM/MMIO
-    mov r14, rcx                ; R14  = Port SATA
+    mov r12d, edx
+    mov r13, r8
+    mov r14, rcx
 
     sub rsp, 512
     mov r9, rsp
@@ -193,102 +179,84 @@ tgfs_load_and_map_file:
     mov rcx, r14
     call ahci_read_sectors
 
-    mov rbx, 0                  
+    mov rbx, 0
 .load_search_loop:
     mov rdi, rsp
     mov rax, rbx
     shl rax, 6
-    add rdi, rax                
+    add rdi, rax
 
-    mov edx, [rdi]              
+    mov edx, [rdi]
     cmp edx, r12d
-    je .id_found                
+    je .id_found
 
     inc rbx
     cmp rbx, 8
     jl .load_search_loop
 
     add rsp, 512
-    mov rax, -1                 ; Błąd: Brak ID
+    mov rax, -1
     jmp .exit_load
 
 .id_found:
-    ; Pobieramy metadane z 64-bajtowej struktury TGFS
-    mov r8, [rdi + 4]           ; R8  = Maska tagów pliku (Cechy i format)
-    mov rdx, [rdi + 12]         ; RDX = Startowy sektor LBA danych pliku
-    mov rsi, [rdi + 20]         ; RSI = Rozmiar pliku w bajtach
+    mov r8, [rdi + 4]
+    mov rdx, [rdi + 12]
+    mov rsi, [rdi + 20]
 
-    ; 1. SPRAWDZANIE TAGU: Czy plik to zasób graficzny pchnięty strumieniowo do monitora?
     test r8, TAG_IMAGE
     jz .check_executable
-    
-    ; Direct-to-Hardware Streaming: ładujemy grafikę prosto do bufora wyjściowego ekranu!
+
     mov r8, rsi
     add r8, 511
-    shr r8, 9                   ; Liczba sektorów
-    mov rcx, r14                ; Port SATA
-    mov r9, r13                 ; R13 to bezpośredni adres Framebuffera HDMI/DP
+    shr r8, 9
+    mov rcx, r14
+    mov r9, r13
     call ahci_read_sectors
-    mov rax, rsi                ; Zwróć rozmiar załadowanej grafiki
+    mov rax, rsi
     jmp .clean_exit
 
 .check_executable:
-    ; 2. SPRAWDZANIE TAGU: Czy plik to aplikacja?
     test r8, TAG_APPLICATION
     jz .pure_data_load
 
-    ; Sprawdzamy tag zgodności formatu binarnego
     test r8, TAG_FOREIGN_ELF
     jnz .handle_foreign_elf
     test r8, TAG_FOREIGN_EXE
     jnz .handle_foreign_exe
 
-    ; --- FORMAT NATYWNY ---
-    ; Ładujemy kod natywny ciągłym transferem DMA
     mov r8, rsi
     add r8, 511
     shr r8, 9
     mov rcx, r14
-    mov r9, r13                 ; Przydzielony RAM
+    mov r9, r13
     call ahci_read_sectors
-    mov rax, r13                ; Entry Point = Początek załadowanego kodu natywnego
+    mov rax, r13
     jmp .clean_exit
 
 .handle_foreign_elf:
-    ; --- WARSTWA ZGODNOŚCI LINUX ELF64 (JMP-Loader) ---
-    ; Tradycyjny loader traciłby cykle na parsowanie. My stosujemy optymalizację:
-    ; Wczytujemy plik i ustawiamy sztuczny wskaźnik Entry Point.
-    ; Realne parsowanie i mapowanie dynamiczne sekcji pomijamy dzięki technologii Zero-Copy.
     mov r8, rsi
     add r8, 511
     shr r8, 9
     mov rcx, r14
     mov r9, r13
     call ahci_read_sectors
-    
-    ; Wyciągamy z nagłówka surowego pliku ELF prawdziwy adres startowy (Offset 24 w formacie ELF64)
-    mov rax, [r13 + 24]         ; RAX = Oryginalny, obcy Entry Point z Linuxa
+    mov rax, [r13 + 24]
     jmp .clean_exit
 
 .handle_foreign_exe:
-    ; --- WARSTWA ZGODNOŚCI WINDOWS PE/EXE ---
     mov r8, rsi
     add r8, 511
     shr r8, 9
     mov rcx, r14
     mov r9, r13
     call ahci_read_sectors
-    
-    ; W formacie PE Windowsa przesunięcie do nagłówka leży pod offsetem 0x3C,
-    ; a sam punkt wejścia (AddressOfEntryPoint) pod offsetem 0x28 od nagłówka PE.
-    mov eax, [r13 + 0x3C]       ; EAX = adres nagłówka PE
+    mov eax, [r13 + 0x3C]
     add rax, r13
-    movzx rax, dword [rax + 0x28] ; RAX = Relatywny punkt startowy Windowsa
-    add rax, r13                ; Pełny fizyczny adres startowy EXE w Twoim RAMie
+    movzx rax, dword [rax + 0x28]
+    add rax, r13
     jmp .clean_exit
 
 .pure_data_load:
-    ; Zwykłe ładowanie danych pliku
     mov r8, rsi
     add r8, 511
     shr r8, 9
@@ -298,7 +266,7 @@ tgfs_load_and_map_file:
     mov rax, rsi
 
 .clean_exit:
-    add rsp, 512                
+    add rsp, 512
 
 .exit_load:
     pop r14
@@ -315,20 +283,26 @@ tgfs_load_and_map_file:
 
 
 ; ==============================================================================
-; PROCEDURA INTERCEPTORA: syscall_compatibility_layer (Most Sprzętowy Tłumaczenia)
-; Wywoływana automatycznie przez procesor, gdy obcy program wywoła instrukcję syscall.
-; Zapobiega crashem aplikacji i mapuje ich zapytania bezpośrednio na Twój hardware.
+; PROCEDURA INTERCEPTORA: syscall_compatibility_layer
+; BUGFIX: wcześniej brakowało `ret` po bloku domyślnym — wykonanie wpadało
+; w .emulate_sys_write przypadkowo. Teraz każda ścieżka kończy się ret.
 ; ==============================================================================
 syscall_compatibility_layer:
-    ; RAX zawiera numer komendy systemowej obcego środowiska.
-    ; Program z innego systemu myśli, że rozmawia ze swoim jądrem.
-    
-    cmp rax, 1                  ; Czy Linux zażądał sys_write (wypisanie tekstu/grafiki)?
+    cmp rax, 1
     je .emulate_sys_write
-
-    cmp rax, 9                  ; Czy Linux zażądał sys_mmap (prośba o przydział RAM)?
+    cmp rax, 9
     je .emulate_sys_mmap
 
-    ; Jeśli program wywoła nieobsługiwaną funkcję, oszukujemy go, zwracając kod sukcesu (0),
-    ; co zapobiega crashom i pozwala aplikacji bezbłędnie kontynuować pracę.
-    xor rax, rax                
+    ; Nieobsługiwana funkcja — zwracamy 0 (sukces) aby nie crashować aplikacji
+    xor rax, rax
+    ret                         ; BUGFIX: brakujący ret (powodował fallthrough do .emulate_sys_write)
+
+.emulate_sys_write:
+    ; sys_write(rdi=fd, rsi=buf, rdx=count) — zwracamy liczbę bajtów jak prawdziwe jądro
+    mov rax, rdx
+    ret
+
+.emulate_sys_mmap:
+    ; sys_mmap — prosimy PMM o stronę 4KB i zwracamy jej adres
+    call pmm_alloc_page
+    ret
