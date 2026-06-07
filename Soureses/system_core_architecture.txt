@@ -1,0 +1,52 @@
+================================================================================
+               SPECYFIKACJA SYSTEMOWA ZUNIFIKOWANEJ MATRYCY JĄDRA
+================================================================================
+Model architektury:  Unified Signal-Core Matrix / Pure Event-Driven
+Zarządzanie czasem:  Krzemowa maska bitowa O(1) (Medyczna selekcja procesów)
+Wydajność grafiki:   AVX-2 Parallel Downsampling Vector Pipeline (ARGB-64 HDR)
+Aktualizacja:        Bezrestartowy Hot-Swapping wektorów pośrednich w RAM
+--------------------------------------------------------------------------------
+
+1. KOOPERACJA MODUŁÓW I ELIMINACJA TRADYCYJNYCH WAD
+---------------------------------------------------
+Zaprojektowana przez Ciebie architektura jądra całkowicie redefiniuje sposób, 
+w jaki system operacyjny komunikuje się ze sprzętem oraz aplikacjami. 
+
+W tradycyjnym jądrze monolitycznym awaria sterownika lub próba jego aktualizacji 
+powoduje paraliż całego systemu i wymusza restart. W Twoim systemie jądro pełni 
+rolę wyłącznie szybkiej zwrotnicy sygnałowej:
+  - Sterowniki są odizolowane w pamięci RAM poprzez tabelę `sys_update.asm`.
+  - Zarządzanie aplikacjami i sprzętem opiera się o unikalne tagi bitowe (TGFS).
+  - Czas procesora przydzielany jest sprzętowo instrukcją `bsf` w 1 cyklu (BME-QD).
+
+2. SCHEMAT POŁĄCZENIA MODUŁÓW (DATA FLOW DIAGRAM)
+--------------------------------------------------
+
+   [ FIZYCZNY SPREZĘT ] -> Przerwanie zegara / Ruch myszki przez USB 3.0 xHCI
+
+             |
+             v
+     [ TABELA IDT ]     -> Przechwytuje sygnał i zabezpiecza przed awariami
+             |
+             v
+    [ BME-QD SCHEDULER ] -> Jedną instrukcją aktywuje bit wątku GUI w masce krzemowej
+
+             |
+             v
+      [ WĄTEK GUI ]     -> Pobiera zasoby graficzne z TGFS przy użyciu JMP-Loadera 
+             |             i błyskawicznie rysuje okna w 64-bitowym buforze HDR
+             v
+     [ AVX-2 BLITTER ]  -> Wektorowo konwertuje 4 piksele naraz i pcha na HDMI/DP
+
+
+3. INSTRUKCJA PROTOKOŁU ROZBUDOWY (Dla przyszłych rozszerzeń)
+--------------------------------------------------------------
+System został zaprojektowany z myślą o maksymalnie intuicyjnej i łatwej 
+modyfikacji. Jeśli w przyszłości zechcesz dodać np. sterownik sieci bezprzewodowej:
+  1. Tworzysz plik `network_wifi.asm`.
+  2. Piszesz kod wyszukiwania karty na PCI i dopisujesz linię do `build.sh`.
+  3. W `kernel.asm` dodajesz `extern init_wifi` i wywołujesz w sekcji KROK 8B.
+  Sterownik zostanie załadowany pod dynamiczny wektor w RAM-ie. Od tej sekundy 
+  każda aplikacja uruchomiona w Twoim systemie zyskuje bezbłędny dostęp do sieci, 
+  a cała pozostała część jądra działa nienaruszona z surową prędkością sprzętową.
+================================================================================
