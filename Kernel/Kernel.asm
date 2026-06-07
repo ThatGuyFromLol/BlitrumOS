@@ -53,10 +53,44 @@ section .text
 _start:
     cli                         ; 1. Sprzętowa blokada przerwań na czas rozruchu
 
-    ; --- 3. WERYFIKACJA SYGNATURY PLATFORMY BOOTLOADERA ---
-    cmp rdx, 0x55454649         ; Czy bootloader UEFI przesłał sygnaturę "UEFI"?
-    jne .kernel_panic           ; Brak flagi -> natychmiastowe zatrzymanie jądra
+       ; Sprawdź sygnaturę bootloadera
+    cmp rdx, 0x55454649         ; "UEFI"
+    je .boot_uefi
+    cmp rcx, 0x42494F53         ; "BIOS" (Legacy)
+    je .boot_legacy
+    jmp .kernel_panic
 
+.boot_uefi:
+    ; Odczyt parametrów UEFI ze stosu (jak było wcześniej)
+    mov eax, [rsp + 32]
+    mov [fb_width], eax
+    mov eax, [rsp + 40]
+    mov [fb_height], eax
+    mov eax, [rsp + 48]
+    mov [fb_pps], eax
+    mov rax, [rsp + 56]
+    mov [mmap_ptr], rax
+    mov rax, [rsp + 64]
+    mov [mmap_size], rax
+    mov rax, [rsp + 72]
+    mov [mmap_descsz], rax
+    jmp .boot_common
+
+.boot_legacy:
+    ; Odczyt mapy E820 przekazanej przez Legacy bootloader
+    mov rax, [rsp + 40]         ; Adres bufora E820 (0x6000)
+    mov [mmap_ptr], rax
+    mov rax, [rsp + 32]         ; Liczba deskryptorów
+    mov rbx, 24
+    mul rbx                     ; Rozmiar mapy = liczba * 24
+    mov [mmap_size], rax
+    mov qword [mmap_descsz], 24 ; Deskryptor E820 = 24 bajty
+    ; Brak framebuffera GOP — GUI działa w trybie tekstowym VGA
+    mov qword [fb_width], 0
+    mov qword [fb_height], 0
+    mov qword [fb_pps], 0
+
+.boot_common:
     ; --- 2. ODCZYT PARAMETRÓW ROZDZIELCZOŚCI Z BOOTLOADERA ---
     ; UWAGA: bootloader skoczył tu instrukcją `jmp` (bez `call`), więc nie odłożył
     ; adresu powrotu. Parametry leżą na stosie bootloadera od [rsp+32] w górę.
