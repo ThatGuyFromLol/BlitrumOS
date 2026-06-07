@@ -37,6 +37,8 @@ extern scheduler_trigger_event  ; z custom_sceduler.asm
 ; Wektory systemu aktualizacji AHS-TUS
 extern update_system_init       ; z ahs-tus.asm
 extern update_register_vector   ; z ahs-tus.asm
+extern scheduler_event_loop
+extern hid_init
 extern update_check
 extern update_apply
 extern update_is_pending
