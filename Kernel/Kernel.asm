@@ -15,6 +15,7 @@ global _start
 ; ==============================================================================
 ; INDEKS STEROWNIKÓW I SYSTEMU (Podpięcie Twoich plików ze zdjęć)
 ; ==============================================================================
+extern pit_init
 extern bsod_init
 extern serial_init
 extern serial_log
@@ -188,6 +189,7 @@ _start:
     call bsod_init  
     call shell_init
     call serial_init
+    call pit_init
     lea rsi, [rel msg_boot]
     call serial_log
 msg_boot: db "Kernel uruchomiony!", 0
