@@ -141,7 +141,46 @@ Offset	Rozmiar	Zawartość
 +40	8B	Offset danych w paczce
 +48	16B	Zarezerwowane
 ---
+---
 
-Commit message: `docs: aktualizacje.md — instrukcja tworzenia paczek update.pkg`
+## 🛡️ Ochrona przed złośliwym kodem
 
-Gotowe! 🚀
+Każdy moduł jest skanowany **przed załadowaniem** i **podczas działania**.
+
+### Poziom 1 — Skaner statyczny (przed załadowaniem)
+
+| Test | Co sprawdza |
+|------|-------------|
+| Checksum XOR-64 | Czy plik nie został zmodyfikowany |
+| Blacklista instrukcji | Blokuje niebezpieczne instrukcje |
+| NOP sled detection | Wykrywa shellcode padding (16+ NOP z rzędu) |
+| Rozmiar modułu | Min 16B, max 2MB |
+
+### Zablokowane instrukcje
+
+| Instrukcja | Dlaczego blokowana |
+|------------|--------------------|
+| `MOV CR0/CR3/CR4` | Zmiana trybu procesora / tablicy stron |
+| `LGDT` / `LIDT` | Podmiana tablic systemowych |
+| `WRMSR` | Zapis do rejestrów modelu CPU |
+| `IN` / `OUT` | Bezpośredni dostęp do portów I/O |
+| `CLI` | Wyłączenie przerwań |
+| `HLT` | Zatrzymanie procesora |
+| `INVLPG` | Unieważnienie TLB |
+
+### Poziom 2 — Runtime Guard (podczas działania)
+
+Moduł działa wyłącznie w przedziale RAM `0x03000000 – 0x03100000`.
+Próba dostępu poza ten obszar → automatyczny rollback do poprzedniej wersji.
+
+### Kody błędów
+
+| Kod | Znaczenie |
+|-----|-----------|
+| 0 | OK — moduł bezpieczny |
+| 1 | Zły checksum |
+| 2 | Niebezpieczna instrukcja |
+| 3 | NOP sled (shellcode) |
+| 4 | Moduł za duży (>2MB) |
+| 5 | Moduł za mały (<16B) |
+| 6 | Naruszenie obszaru RAM (runtime) |
