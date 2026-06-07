@@ -33,7 +33,8 @@ extern init_hda_controller      ; z audio_hca.asm
 extern scheduler_init           ; z custom_sceduler.asm (Scheduler BME-QD)
 extern scheduler_create_task    ; z custom_sceduler.asm
 extern scheduler_trigger_event  ; z custom_sceduler.asm
-
+extern shell_init
+extern shell_run
 ; Wektory systemu aktualizacji AHS-TUS
 extern update_system_init       ; z ahs-tus.asm
 extern update_register_vector   ; z ahs-tus.asm
