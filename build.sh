@@ -53,7 +53,7 @@ nasm -f elf64 Tools/tgfs_vfs.asm        -o tgfs_vfs.o
 echo "-> Wszystkie moduly skompilowane pomyslnie."
 
 # --- KROK 4: LINKOWANIE ---
-echo "-> ld -T linker.ld kernel.o idt.o pmm.o gui_hdr.o gui_men.o video_gop.o usb_interrupts.o multicore_legacy.o ahci.o audio_hca.o pci_dyski.o usb_controller.o custom_sceduler.o hid_parser.o shell.o ahs-tus.o malicious_check.o update_loader.o tgfs_vfs.o -o kernel.bin
+ld -T linker.ld kernel.o idt.o pmm.o gui_hdr.o gui_men.o video_gop.o usb_interrupts.o multicore_legacy.o ahci.o audio_hca.o pci_dyski.o usb_controller.o custom_sceduler.o hid_parser.o shell.o ahs-tus.o malicious_check.o update_loader.o tgfs_vfs.o -o kernel.bin
 
 echo "--------------------------------------------------------------------"
 echo "  [SUKCES] Caly system operacyjny zostal zbudowany do: kernel.bin"
