@@ -41,6 +41,8 @@ extern update_register_vector
 extern update_call_vector
 extern ahci_read_sectors
 extern pmm_alloc_page
+extern malicious_check_static
+extern mcd_get_last_error
 
 PKG_MAGIC           equ 0x4B505355
 PKG_TGFS_ID         equ 99
@@ -212,27 +214,23 @@ update_apply:
     add rdi, rcx
 .has_addr:
 
-    ; Weryfikacja checksum modułu
+      ; Weryfikacja checksum modułu przed załadowaniem
     push rsi
     push rdi
     push r13
-    mov rsi, rax
-    mov rcx, r13
-    shr rcx, 3
-    xor rax, rax
-.mod_xor:
-    xor rax, [rsi]
-    add rsi, 8
-    dec rcx
-    jnz .mod_xor
+    mov rsi, rax                ; Adres danych modułu
+    mov rcx, rax                ; RCX = adres
+    mov rdx, r13                ; RDX = rozmiar
+    mov r8, rbx                 ; R8  = oczekiwany checksum
+    call malicious_check_static ; Skaner statyczny + blacklist + NOP sled
     pop r13
     pop rdi
     pop rsi
 
-    cmp rax, rbx
-    jne .skip_module
-
-    ; Kopiuj dane modułu pod adres docelowy
+    test rax, rax
+    jnz .skip_module            ; Nie przeszedł skanowania — pomijamy moduł
+    
+; Kopiuj dane modułu pod adres docelowy
     push rsi
     mov rsi, PKG_LOAD_ADDR
     add rsi, rdx
