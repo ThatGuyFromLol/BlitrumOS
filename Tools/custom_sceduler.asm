@@ -225,6 +225,7 @@ scheduler_event_loop:
     mov [hid_report_buf], rax
     lea rcx, [rel hid_report_buf]
     call hid_parse_keyboard
+    call shell_run
     jmp .loop
 
 .handle_mouse:
