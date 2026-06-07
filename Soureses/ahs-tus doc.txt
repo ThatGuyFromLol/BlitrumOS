@@ -1,0 +1,48 @@
+================================================================================
+                    SPECYFIKACJA SYSTEMU AKTUALIZACJI W LOCIE
+                AHS-TUS (Atomic Hot-Swapping Tagged Update System)
+================================================================================
+Zasada działania:   Modyfikacja wektorów pośrednich w czasie rzeczywistym (Run-time)
+Bezpieczeństwo:     W 100% lock-free/atomowe na poziomie szyny systemowej (Lock Xchg)
+Narzut na restart:  0% - Całkowity brak konieczności restartowania maszyny
+Plik źródłowy:      sys_update.asm
+--------------------------------------------------------------------------------
+
+1. PROBLEM TRADYCYJNYCH AKTUALIZACJI (Windows / Linux)
+-------------------------------------------------------
+W klasycznych systemach operacyjnych jądro oraz sterowniki są monolitycznym, 
+sztywnym blokiem pamięci. Aktualizacja sterownika (np. karty graficznej) wymaga 
+nadpisania pliku na dysku, co wymusza restart usług lub całego komputera, 
+ponieważ procesor nie potrafi bezpiecznie zmienić adresu wykonywanej funkcji 
+w trakcie jej pracy. Przerwanie zasilania w tym momencie uszkadza system.
+
+2. INNOWACJA ARCHITEKTURY AHS-TUS
+---------------------------------
+System AHS-TUS całkowicie eliminuje te wady dzięki izolacji wywołań przez 
+Systemową Tabelę Wektorów (`system_vector_table`). 
+
+  A. Pośrednie Wywoływanie (Indirect Vectoring):
+     Główny jądro (Kernel) oraz interfejs GUI nie wywołują sterowników sprzętowych 
+     poprzez bezpośredni skok (`call find_usb`). Zamiast tego podają do funkcji 
+     `update_call_vector` unikalne ID sterownika (np. ID 2 = Sterownik Grafiki). 
+     System wykonuje błyskawiczny skok pośredni.
+
+  B. Atomowy Hot-Swapping (Bezrestartowa Podmiana):
+     Gdy system plików TGFS wykryje nową wersję sterownika o wyższym tagu 
+     chronologicznym, JMP-Loader wstrzykuje nowy kod pod zupełnie nowy, czysty 
+     adres w pamięci RAM wyznaczony przez `pmm.asm`. 
+     Następnie funkcja `update_hot_swap_driver` wykonuje operację:
+     `lock xchg [system_vector_table + offset], rax`
+     Ta instrukcja na poziomie czystego krzemu, w czasie 1 cyklu procesora, 
+     przepina wskaźnik sterownika. Stary kod w ułamku nanosekundy przestaje 
+     być wykonywany, a procesor zaczyna realizować instrukcje nowej wersji, 
+     bez zamykania aplikacji użytkownika i bez restartu komputera.
+
+  C. Automatyczny Bezpieczny Rollback:
+     Ponieważ stara wersja sterownika po instrukcji `lock xchg` zostaje zwrócona 
+     w rejestrze RAX, jądro nie kasuje jej od razu z pamięci RAM. Jeśli nowo 
+     załadowany sterownik posiada błąd, który wywoła błąd IDT (np. Page Fault), 
+     procedura obsługi błędu jądra automatycznie wykonuje operację odwrotną — 
+     w ułamku mikrosekundy przywraca stary, stabilny adres z rejestru do tabeli. 
+     System jest całkowicie odporny na uszkodzenia oprogramowania.
+================================================================================
