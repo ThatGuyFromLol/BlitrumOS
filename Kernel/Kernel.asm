@@ -184,7 +184,12 @@ _start:
     call scheduler_init         ; Przygotowanie 64-bitowej maski procesów
     call hid_init
     call bsod_init  
-    call shell_init             ; Inicjalizacja parsera klawiatury i myszy
+    call shell_init
+    call serial_init
+    lea rsi, [rel msg_boot]
+    call serial_log
+msg_boot: db "Kernel uruchomiony!", 0
+             ; Inicjalizacja parsera klawiatury i myszy
     ; --- KROK 10: URUCHOMIENIE INTERFEJSU GRAFICZNEGO ---
     cmp byte [tgfs_active], 1
     jne .fallback_render
