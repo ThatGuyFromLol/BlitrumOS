@@ -16,6 +16,8 @@ global _start
 ; INDEKS STEROWNIKÓW I SYSTEMU (Podpięcie Twoich plików ze zdjęć)
 ; ==============================================================================
 extern bsod_init
+extern serial_init
+extern serial_log
 extern scheduler_event_loop
 extern hid_init
 extern idt_init                 ; z idt.asm (Tabela Przerwań)
