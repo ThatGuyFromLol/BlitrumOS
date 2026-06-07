@@ -1,4 +1,4 @@
-# 🖥️ Nowatorski Wektorowy OS
+# 🖥️ BlitrumOS
 
 > Eksperymentalny system operacyjny x86-64 pisany w czystym NASM Assembly.  
 > Projekt hobbystyczny z ambicjami startup — modularny, wektorowy, z hot-swappingiem sterowników w locie.
